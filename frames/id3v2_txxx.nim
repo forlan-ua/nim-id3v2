@@ -1,48 +1,9 @@
 import streams
 import .. / id3v2_types
 
+import id3v2_t
 
-type Id3v2FrameText* = ref object of Id3v2Frame
-    textEncoding*: int8
-
-
-template textData*(f: Id3v2FrameText): string =
-    return f.data
-
-
-template `textData=`*(f: Id3v2FrameText, s: string) =
-    f.size += s.len - f.data.len
-    f.data = s
-
-
-method writeData*(f: Id3v2FrameText, s: Stream) =
-    f.writeHeader(s)
-    s.write(f.textEncoding.byte)
-    s.write(f.data)
-
-
-proc newId3v2FrameText*(flags: int16, kind: Id3v2FrameKind, str: string): Id3v2FrameText =
-    let len = str.len
-    Id3v2FrameText(
-        kind: kind, 
-        flags: flags,
-        textEncoding: str[0].int8, 
-        data: str[1..<len], 
-        size: len
-    )
-
-
-proc newId3v2FrameText*(flags: int16, kind: Id3v2FrameKind, textEncoding: int8, data: string): Id3v2FrameText =
-    Id3v2FrameText(
-        kind: kind, 
-        flags: flags, 
-        textEncoding: textEncoding, 
-        data: data, 
-        size: 1 + data.len
-    )
-
-
-type Id3v2FrameTXXX* = ref object of Id3v2FrameText
+type Id3v2FrameTXXX* = ref object of Id3v2FrameT
     frameDescription: string
 
 

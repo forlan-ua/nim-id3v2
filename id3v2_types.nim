@@ -98,7 +98,7 @@ type Id3v2Frame* = ref object of RootObj
     flags*: int16
 
 
-proc writeBinaryInt*[T](s: Stream, i: T, bytes: int = 255) =
+proc writeBinaryInt*[T](s: Stream, i: T, mask: int = 255) =
     var len: int;
 
     if T is int8:
@@ -111,8 +111,20 @@ proc writeBinaryInt*[T](s: Stream, i: T, bytes: int = 255) =
     for i in 0..<len:
         let shift = len - 1 - i
         s.write(
-            (i and (bytes shl shift)) shr shift
+            (i and (mask shl shift)) shr shift
         )
+
+
+proc readBinaryInt*(s: Stream, len: int = 4, shift: int = 8): int8 | int16 | int =
+    let mask = (1 shl (shift + 1)) - 1
+    if len == 1:
+        result = s.readInt8() and mask
+    elif len == 2:
+        result = (s.readInt8() and mask).int16 shl shift + (s.readInt8() and mask).int16
+    else:
+        result = 0.int
+        for i in 0..<len:
+            result += (s.readInt8() and mask).int shl (shift * (len - i))
 
 
 proc writeHeader*(f: Id3v2Frame, s: Stream) =
@@ -171,7 +183,7 @@ proc writeHeader*(t: Id3v2Tag, s: Stream) =
     s.write("ID3")
     s.write(t.version.int8)
     s.write(t.subversion)
-    s.writeBinaryInt(t.size, bytes=127)
+    s.writeBinaryInt(t.size, mask=127)
     s.writeBinaryInt(t.flags)
 
 
@@ -179,7 +191,7 @@ proc writeData*(t: Id3v2Tag, s: Stream) =
     s.write("ID3")
     s.write(t.version.int8)
     s.write(t.subversion)
-    s.writeBinaryInt(t.size, bytes=127)
+    s.writeBinaryInt(t.size, mask=127)
     s.writeBinaryInt(t.flags)
 
     for frame in t.frames:
