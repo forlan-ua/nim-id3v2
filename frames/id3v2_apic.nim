@@ -53,9 +53,22 @@ proc describe*(t: Id3v2FrameAPICType): string =
 
 type Id3v2FrameAPIC* = ref object of Id3v2FrameBinary
     textEncoding*: int8
-    mimeType*: string
     pictureType*: Id3v2FrameAPICType
-    description*: string
+
+    frameMimeType: string
+    frameDescription: string
+
+
+template mimeType*(f: Id3v2FrameAPIC): string = f.frameMimeType
+template `mimeType=`*(f: Id3v2FrameAPIC, mimeType: string) =
+    f.size += mimeType.len - f.frameMimeType.len
+    f.frameMimeType = mimeType
+
+
+template description*(f: Id3v2FrameAPIC): string = f.frameDescription
+template `description=`*(f: Id3v2FrameAPIC, description: string) =
+    f.size += description.len - f.frameDescription.len
+    f.frameDescription = description
 
 
 method `binaryData=`*(f: Id3v2FrameAPIC, d: string) =
@@ -66,10 +79,10 @@ method `binaryData=`*(f: Id3v2FrameAPIC, d: string) =
 method writeData*(f: Id3v2FrameAPIC, s: Stream) =
     f.writeHeader(s)
     s.writeBinaryInt(f.textEncoding)
-    s.write(f.mimeType)
+    s.write(f.frameMimeType)
     s.write(0b0.byte)
     s.writeBinaryInt(f.pictureType.int8)
-    s.write(f.description)
+    s.write(f.frameDescription)
     s.write(0b0.byte)
     if (f.textEncoding and 1) != 0:
         s.write(0b0.byte)
@@ -77,37 +90,31 @@ method writeData*(f: Id3v2FrameAPIC, s: Stream) =
 
 
 proc newId3v2FrameAPIC*(flags: int16, str: string): Id3v2FrameAPIC =
-    let textEncoding = str[0].int8
     let len = str.len
-    var j = 1
+    result = Id3v2FrameAPIC(
+        kind: APIC, 
+        flags: flags, 
+        textEncoding: str[0].int8,
+        size: len
+    )
 
     var i = 1
-    while j < len and str[j].byte != 0b0.byte:
+    var j = 1
+    while j < len and str[j].byte != 0.byte:
         j.inc
-    let mimeType = str[i..<j]
+    result.frameMimeType = str[i..<j]
     j.inc
 
-    let pictureType = str[j].Id3v2FrameAPICType
+    result.pictureType = str[j].Id3v2FrameAPICType
     j.inc
 
     i = j
-    while j < len and str[j].byte != 0b0.byte:
+    while j < len and str[j].byte != 0.byte:
         j.inc
-    let description = str[i..<j]
-    j.inc
-    if (textEncoding and 1) == 0 and str[j].byte == 0b0.byte:
-        j.inc
+    result.frameDescription = str[i..<j]
+    j.inc(if (result.textEncoding and 1) == 0 and str[j].byte == 0.byte: 2 else: 1)
 
-    Id3v2FrameAPIC(
-        kind: APIC, 
-        flags: flags, 
-        textEncoding: textEncoding, 
-        mimeType: mimeType, 
-        pictureType: pictureType,
-        description: description,
-        data: str[j..<len],
-        size: len
-    )
+    result.data = str[j..<len]
 
 
 proc newId3v2FrameAPIC*(flags: int16, textEncoding: int8, mimeType: string, pictureType: Id3v2FrameAPICType, description: string, data: string): Id3v2FrameAPIC =
@@ -115,9 +122,9 @@ proc newId3v2FrameAPIC*(flags: int16, textEncoding: int8, mimeType: string, pict
         kind: APIC, 
         flags: flags, 
         textEncoding: textEncoding, 
-        mimeType: mimeType, 
+        frameMimeType: mimeType, 
         pictureType: pictureType,
-        description: description,
+        frameDescription: description,
         data: data,
-        size: 1 + mimeType.len + 1 + 1 + description.len + (if (textEncoding and 1) == 0: 1 else: 2) + data.len
+        size: 1 + (mimeType.len + 1) + 1 + (description.len + 1 + (textEncoding and 1)) + data.len
     )
